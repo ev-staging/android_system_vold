@@ -117,8 +117,12 @@ static bool isVirtioBlkDevice(unsigned int major) {
      * "ranchu", the device's sysfs path should end with "/block/vd[d-z]", etc.
      * But just having a) and b) is enough for now.
      */
+#ifdef CONFIG_FORCE_VPARTITION
+	return true;
+#else
     return IsRunningInEmulator() && major >= kMajorBlockExperimentalMin &&
            major <= kMajorBlockExperimentalMax;
+#endif
 }
 
 static bool isNvmeBlkDevice(unsigned int major, const std::string& sysPath) {
