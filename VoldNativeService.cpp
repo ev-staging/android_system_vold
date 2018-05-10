@@ -626,11 +626,12 @@ binder::Status VoldNativeService::fdeEnable(int32_t passwordType, const std::str
 }
 
 binder::Status VoldNativeService::fdeChangePassword(int32_t passwordType,
+                                                    const std::string& currentPassword,
                                                     const std::string& password) {
     ENFORCE_UID(AID_SYSTEM);
     ACQUIRE_CRYPT_LOCK;
 
-    return translate(cryptfs_changepw(passwordType, password.c_str()));
+    return translate(cryptfs_changepw(passwordType, currentPassword.c_str(), password.c_str()));
 }
 
 binder::Status VoldNativeService::fdeVerifyPassword(const std::string& password) {
@@ -758,6 +759,14 @@ binder::Status VoldNativeService::addUserKeyAuth(int32_t userId, int32_t userSer
     ACQUIRE_CRYPT_LOCK;
 
     return translateBool(fscrypt_add_user_key_auth(userId, userSerial, token, secret));
+}
+
+binder::Status VoldNativeService::clearUserKeyAuth(int32_t userId, int32_t userSerial,
+        const std::string& token, const std::string& secret) {
+    ENFORCE_UID(AID_SYSTEM);
+    ACQUIRE_CRYPT_LOCK;
+
+    return translateBool(fscrypt_clear_user_key_auth(userId, userSerial, token, secret));
 }
 
 binder::Status VoldNativeService::fixateNewestUserKeyAuth(int32_t userId) {
