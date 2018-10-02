@@ -36,6 +36,7 @@
 #include "android/os/IVoldListener.h"
 
 #include "model/Disk.h"
+#include "model/DiskPartition.h"
 #include "model/VolumeBase.h"
 
 #define DEBUG_APPFUSE 0
@@ -63,8 +64,12 @@ public:
 
     class DiskSource {
     public:
-        DiskSource(const std::string& sysPattern, const std::string& nickname, int flags) :
-                mSysPattern(sysPattern), mNickname(nickname), mFlags(flags) {
+        DiskSource(const std::string& sysPattern, const std::string& nickname,
+                        int partnum, int flags,
+                        const std::string& fstype, const std::string mntopts) :
+                mSysPattern(sysPattern), mNickname(nickname),
+                mPartNum(partnum), mFlags(flags),
+                mFsType(fstype), mMntOpts(mntopts) {
         }
 
         bool matches(const std::string& sysPath) {
@@ -72,12 +77,18 @@ public:
         }
 
         const std::string& getNickname() { return mNickname; }
+        int getPartNum() { return mPartNum; }
         int getFlags() { return mFlags; }
+        const std::string& getFsType() { return mFsType; }
+        const std::string& getMntOpts() { return mMntOpts; }
 
     private:
         std::string mSysPattern;
         std::string mNickname;
+        int mPartNum;
         int mFlags;
+        std::string mFsType;
+        std::string mMntOpts;
     };
 
     void addDiskSource(const std::shared_ptr<DiskSource>& diskSource);
