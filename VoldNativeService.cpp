@@ -256,9 +256,19 @@ binder::Status VoldNativeService::forgetPartition(const std::string& partGuid,
     ENFORCE_SYSTEM_OR_ROOT;
     CHECK_ARGUMENT_HEX(partGuid);
     CHECK_ARGUMENT_HEX(fsUuid);
-    ACQUIRE_LOCK;
+    bool success = true;
 
-    return translate(VolumeManager::Instance()->forgetPartition(partGuid, fsUuid));
+    {
+        ACQUIRE_LOCK;
+        success &= VolumeManager::Instance()->forgetPartition(partGuid, fsUuid);
+    }
+
+    {
+        ACQUIRE_CRYPT_LOCK;
+        success &= fscrypt_destroy_volume_keys(fsUuid);
+    }
+
+    return translateBool(success);
 }
 
 binder::Status VoldNativeService::mount(
@@ -928,6 +938,11 @@ binder::Status VoldNativeService::destroyDsuMetadataKey(const std::string& dsuSl
     ACQUIRE_LOCK;
 
     return translateBool(destroy_dsu_metadata_key(dsuSlot));
+}
+
+binder::Status VoldNativeService::getStorageSize(int64_t* storageSize) {
+    ENFORCE_SYSTEM_OR_ROOT;
+    return translate(GetStorageSize(storageSize));
 }
 
 }  // namespace vold

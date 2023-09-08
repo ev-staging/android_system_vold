@@ -106,7 +106,7 @@ class VolumeManager {
 
     userid_t getSharedStorageUser(userid_t userId);
 
-    int forgetPartition(const std::string& partGuid, const std::string& fsUuid);
+    bool forgetPartition(const std::string& partGuid, const std::string& fsUuid);
 
     int onUserAdded(userid_t userId, int userSerialNumber, userid_t cloneParentUserId);
     int onUserRemoved(userid_t userId);
@@ -241,5 +241,11 @@ class VolumeManager {
     int mNextStubId;
     bool mSecureKeyguardShowing;
 };
+
+namespace android {
+namespace vold {
+android::status_t GetStorageSize(int64_t* storageSize);
+}
+}  // namespace android
 
 #endif

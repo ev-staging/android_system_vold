@@ -36,6 +36,7 @@
 #include <linux/kdev_t.h>
 
 #include <ApexProperties.sysprop.h>
+#include <android-base/file.h>
 #include <android-base/logging.h>
 #include <android-base/parseint.h>
 #include <android-base/properties.h>
@@ -53,6 +54,7 @@
 #include <private/android_filesystem_config.h>
 
 #include <fscrypt/fscrypt.h>
+#include <libdm/dm.h>
 
 #include "AppFuseUtil.h"
 #include "FsCrypt.h"
@@ -346,25 +348,19 @@ void VolumeManager::listVolumes(android::vold::VolumeBase::Type type,
     }
 }
 
-int VolumeManager::forgetPartition(const std::string& partGuid, const std::string& fsUuid) {
+bool VolumeManager::forgetPartition(const std::string& partGuid, const std::string& fsUuid) {
     std::string normalizedGuid;
     if (android::vold::NormalizeHex(partGuid, normalizedGuid)) {
         LOG(WARNING) << "Invalid GUID " << partGuid;
-        return -1;
+        return false;
     }
 
-    bool success = true;
     std::string keyPath = android::vold::BuildKeyPath(normalizedGuid);
     if (unlink(keyPath.c_str()) != 0) {
         LOG(ERROR) << "Failed to unlink " << keyPath;
-        success = false;
+        return false;
     }
-    if (IsFbeEnabled()) {
-        if (!fscrypt_destroy_volume_keys(fsUuid)) {
-            success = false;
-        }
-    }
-    return success ? 0 : -1;
+    return true;
 }
 
 void VolumeManager::destroyEmulatedVolumesForUser(userid_t userId) {
@@ -1195,4 +1191,69 @@ int VolumeManager::unmountAppFuse(uid_t uid, int mountId) {
 
 int VolumeManager::openAppFuseFile(uid_t uid, int mountId, int fileId, int flags) {
     return android::vold::OpenAppFuseFile(uid, mountId, fileId, flags);
+}
+
+android::status_t android::vold::GetStorageSize(int64_t* storageSize) {
+    // Start with the /data mount point from fs_mgr
+    auto entry = android::fs_mgr::GetEntryForMountPoint(&fstab_default, DATA_MNT_POINT);
+    if (entry == nullptr) {
+        LOG(ERROR) << "No mount point entry for " << DATA_MNT_POINT;
+        return EINVAL;
+    }
+
+    // Follow any symbolic links
+    std::string blkDevice = entry->blk_device;
+    std::string dataDevice;
+    if (!android::base::Realpath(blkDevice, &dataDevice)) {
+        dataDevice = blkDevice;
+    }
+
+    // Handle mapped volumes.
+    auto& dm = android::dm::DeviceMapper::Instance();
+    for (;;) {
+        auto parent = dm.GetParentBlockDeviceByPath(dataDevice);
+        if (!parent.has_value()) break;
+        dataDevice = *parent;
+    }
+
+    // Get the potential /sys/block entry
+    std::size_t leaf = dataDevice.rfind('/');
+    if (leaf == std::string::npos) {
+        LOG(ERROR) << "data device " << dataDevice << " is not a path";
+        return EINVAL;
+    }
+    if (dataDevice.substr(0, leaf) != "/dev/block") {
+        LOG(ERROR) << "data device " << dataDevice << " is not a block device";
+        return EINVAL;
+    }
+    std::string sysfs = std::string() + "/sys/block/" + dataDevice.substr(leaf + 1);
+
+    // Look for a directory in /sys/block containing size where the name is a shortened
+    // version of the name we now have
+    // Typically we start with something like /sys/block/sda2, and we want /sys/block/sda
+    // Note that this directory only contains actual disks, not partitions, so this is
+    // not going to find anything other than the disks
+    std::string size;
+    std::string sizeFile;
+    for (std::string sysfsDir = sysfs;; sysfsDir = sysfsDir.substr(0, sysfsDir.size() - 1)) {
+        if (sysfsDir.back() == '/') {
+            LOG(ERROR) << "Could not find valid block device from " << sysfs;
+            return EINVAL;
+        }
+        sizeFile = sysfsDir + "/size";
+        if (android::base::ReadFileToString(sizeFile, &size, true)) {
+            break;
+        }
+    }
+
+    // Read the size file and be done
+    std::stringstream ssSize(size);
+    ssSize >> *storageSize;
+    if (ssSize.fail()) {
+        LOG(ERROR) << sizeFile << " cannot be read as an integer";
+        return EINVAL;
+    }
+
+    *storageSize *= 512;
+    return OK;
 }
