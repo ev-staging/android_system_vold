@@ -607,11 +607,12 @@ binder::Status VoldNativeService::setStorageBindingSeed(const std::vector<uint8_
     return translateBool(setKeyStorageBindingSeed(seed));
 }
 
-binder::Status VoldNativeService::createUserStorageKeys(int32_t userId, bool ephemeral) {
+binder::Status VoldNativeService::createUserStorageKeys(int32_t userId, int32_t userSerial,
+                                                        bool ephemeral) {
     ENFORCE_SYSTEM_OR_ROOT;
     ACQUIRE_CRYPT_LOCK;
 
-    return translateBool(fscrypt_create_user_keys(userId, ephemeral));
+    return translateBool(fscrypt_create_user_keys(userId, userSerial, ephemeral));
 }
 
 binder::Status VoldNativeService::destroyUserStorageKeys(int32_t userId) {
@@ -637,11 +638,12 @@ binder::Status VoldNativeService::getUnlockedUsers(std::vector<int>* _aidl_retur
     return Ok();
 }
 
-binder::Status VoldNativeService::unlockCeStorage(int32_t userId, const std::string& secret) {
+binder::Status VoldNativeService::unlockCeStorage(int32_t userId, int32_t userSerial,
+                                                  const std::string& secret) {
     ENFORCE_SYSTEM_OR_ROOT;
     ACQUIRE_CRYPT_LOCK;
 
-    return translateBool(fscrypt_unlock_ce_storage(userId, secret));
+    return translateBool(fscrypt_unlock_ce_storage(userId, userSerial, secret));
 }
 
 binder::Status VoldNativeService::lockCeStorage(int32_t userId) {
@@ -652,14 +654,15 @@ binder::Status VoldNativeService::lockCeStorage(int32_t userId) {
 }
 
 binder::Status VoldNativeService::prepareUserStorage(const std::optional<std::string>& uuid,
-                                                     int32_t userId, int32_t flags) {
+                                                     int32_t userId, int32_t userSerial,
+                                                     int32_t flags) {
     ENFORCE_SYSTEM_OR_ROOT;
     std::string empty_string = "";
     auto uuid_ = uuid ? *uuid : empty_string;
     CHECK_ARGUMENT_HEX(uuid_);
 
     ACQUIRE_CRYPT_LOCK;
-    return translateBool(fscrypt_prepare_user_storage(uuid_, userId, flags));
+    return translateBool(fscrypt_prepare_user_storage(uuid_, userId, userSerial, flags));
 }
 
 binder::Status VoldNativeService::destroyUserStorage(const std::optional<std::string>& uuid,
