@@ -171,9 +171,6 @@ cc_library_static {
             cflags: ["-DCONFIG_HW_DISK_ENCRYPT_PERF"],
         },
     },
-    whole_static_libs: [
-        "libc++fs",
-    ],
 }
 
 cc_binary {
